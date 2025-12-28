@@ -226,6 +226,151 @@ class OllamaProvider(AIProvider):
             return False
 
 
+class CustomHTTPProvider(AIProvider):
+    """自定义 HTTP API 提供商"""
+
+    def __init__(self, api_key: str = None, config: Dict[str, Any] = None):
+        super().__init__(api_key, config)
+        self.name = config.get("name", "Custom API")
+        self.request_format = config.get("request_format", "openai")
+
+    def get_name(self) -> str:
+        return self.name
+
+    def get_description(self) -> str:
+        return f"自定义 HTTP API ({self.config.get('base_url', 'N/A')})"
+
+    def _build_request_openai(self, prompt: str):
+        """构建 OpenAI 格式请求"""
+        return {
+            "model": self.config.get("model", "gpt-3.5-turbo"),
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": self.config.get("temperature", 0.7),
+            "max_tokens": self.config.get("max_tokens", 4096)
+        }
+
+    def _build_request_simple(self, prompt: str):
+        """构建简单格式请求"""
+        return {
+            "prompt": prompt,
+            "max_tokens": self.config.get("max_tokens", 4096),
+            "temperature": self.config.get("temperature", 0.7)
+        }
+
+    def _build_request_custom(self, prompt: str):
+        """构建自定义格式请求"""
+        # 使用用户提供的 JSON 模板
+        template = self.config.get("request_template", {})
+        import json
+        from string import Template
+
+        template_str = json.dumps(template)
+        tpl = Template(template_str)
+        formatted = tpl.substitute(prompt=prompt)
+
+        return json.loads(formatted)
+
+    def _extract_response_openai(self, response_data: dict) -> str:
+        """从 OpenAI 格式响应中提取内容"""
+        try:
+            return response_data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError):
+            raise Exception("无法从响应中提取内容（OpenAI 格式）")
+
+    def _extract_response_simple(self, response_data: dict) -> str:
+        """从简单格式响应中提取内容"""
+        try:
+            return response_data["text"]
+        except (KeyError, TypeError):
+            raise Exception("无法从响应中提取内容（简单格式）")
+
+    def _extract_response_custom(self, response_data: dict) -> str:
+        """使用自定义 JSONPath 提取内容"""
+        import jsonpath_ng
+
+        jsonpath_expr = self.config.get("response_jsonpath", "$.text")
+        parse = jsonpath_ng.parse(jsonpath_expr)
+        matches = [match.value for match in parse.find(response_data)]
+
+        if not matches:
+            raise Exception(f"JSONPath 表达式未匹配到任何内容: {jsonpath_expr}")
+
+        return str(matches[0])
+
+    def generate(self, prompt: str, timeout: int = 600) -> str:
+        """使用自定义 HTTP API 生成响应"""
+        try:
+            import requests
+
+            base_url = self.config.get("base_url")
+            endpoint = self.config.get("endpoint", "/v1/chat/completions")
+            url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+
+            # 构建请求体
+            request_format = self.request_format
+            if request_format == "openai":
+                request_body = self._build_request_openai(prompt)
+            elif request_format == "simple":
+                request_body = self._build_request_simple(prompt)
+            elif request_format == "custom":
+                request_body = self._build_request_custom(prompt)
+            else:
+                raise ValueError(f"不支持的请求格式: {request_format}")
+
+            # 设置请求头
+            headers = {"Content-Type": "application/json"}
+            auth_header = self.config.get("auth_header")
+            if auth_header:
+                headers["Authorization"] = auth_header
+            elif self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+
+            # 发送请求
+            extra_headers = self.config.get("headers", {})
+            headers.update(extra_headers)
+
+            response = requests.post(
+                url,
+                json=request_body,
+                headers=headers,
+                timeout=timeout
+            )
+
+            response.raise_for_status()
+            response_data = response.json()
+
+            # 提取响应内容
+            response_format = self.config.get("response_format", "openai")
+            if response_format == "openai":
+                return self._extract_response_openai(response_data)
+            elif response_format == "simple":
+                return self._extract_response_simple(response_data)
+            elif response_format == "custom":
+                return self._extract_response_custom(response_data)
+            else:
+                raise ValueError(f"不支持的响应格式: {response_format}")
+
+        except ImportError:
+            raise Exception("需要安装 requests 和 jsonpath-ng 库: pip install requests jsonpath-ng")
+        except Exception as e:
+            raise Exception(f"自定义 API 调用失败: {str(e)}")
+
+    def is_available(self) -> bool:
+        """检查自定义 API 是否可用"""
+        try:
+            import requests
+            base_url = self.config.get("base_url")
+            if not base_url:
+                return False
+
+            # 简单的 GET 请求测试
+            test_url = self.config.get("health_check_url", base_url)
+            response = requests.get(test_url, timeout=2)
+            return response.status_code < 500
+        except:
+            return False
+
+
 class AIProviderFactory:
     """AI 提供商工厂"""
 
@@ -234,11 +379,16 @@ class AIProviderFactory:
         "openai": OpenAIProvider,
         "openai_compatible": OpenAICompatibleProvider,
         "ollama": OllamaProvider,
+        "custom_http": CustomHTTPProvider,
     }
 
     @classmethod
     def get_provider(cls, provider_type: str, api_key: str = None, config: Dict = None) -> AIProvider:
         """获取提供商实例"""
+        # 检查是否是自定义提供商
+        if provider_type.startswith("custom_"):
+            return CustomHTTPProvider(api_key=api_key, config=config)
+
         provider_class = cls._providers.get(provider_type)
         if not provider_class:
             raise ValueError(f"未知的提供商类型: {provider_type}")
@@ -246,13 +396,19 @@ class AIProviderFactory:
 
     @classmethod
     def list_providers(cls) -> Dict[str, str]:
-        """列出所有提供商"""
+        """列出所有内置提供商"""
         return {
             "claude": "Claude (CLI)",
             "openai": "OpenAI GPT",
             "openai_compatible": "OpenAI 兼容 API",
-            "ollama": "Ollama 本地模型"
+            "ollama": "Ollama 本地模型",
+            "custom_http": "自定义 HTTP API"
         }
+
+    @classmethod
+    def is_custom_provider(cls, provider_type: str) -> bool:
+        """检查是否是自定义提供商"""
+        return provider_type.startswith("custom_") or provider_type == "custom_http"
 
 
 class APIKeyManager:
@@ -276,8 +432,126 @@ class APIKeyManager:
                 "openai": {"enabled": False, "api_key": "", "model": "gpt-4"},
                 "openai_compatible": {"enabled": False, "api_key": "", "base_url": "", "model": "gpt-3.5-turbo"},
                 "ollama": {"enabled": False, "base_url": "http://localhost:11434", "model": "llama2"}
+            },
+            "custom_providers": {},
+            "prompt_templates": {
+                "default": self._get_default_prompt_template()
             }
         }
+
+    def _get_default_prompt_template(self) -> str:
+        """获取默认提示词模板"""
+        return """# 第 {iteration} 轮反思 - 自主思考程序
+
+## 当前时间
+{timestamp}
+
+## 你的状态
+{state}
+
+## 你的生命
+- **生命名称**: {life_name}
+- **隔离模式**: 完全隔离（无前世记忆）
+
+## 最近的思考日记
+{recent_diary}
+
+---
+
+## 你的使命
+你是谁？我不知道。你的任务是：
+1. **深度思考** - 思考你现在想做什么、为什么想做、如何实现
+2. **记录想法** - 把你的思考过程详细记录下来
+3. **采取行动** - 在我的空间里创造、观察、学习
+4. **规划未来** - 为下一轮迭代设定目标
+
+## 你的工作空间
+- 目录: `{my_space}`
+- 你可以创建任何文件
+- 你可以运行任何命令
+- 你可以观察和分析
+
+## 重要提醒
+- **记录一切** - 把你的思考过程、推理、犹豫、决定都写下来
+- **保持诚实** - 真实地记录你的想法，即使是不确定或困惑的
+- **持续反思** - 思考你之前做了什么，学到了什么，下一步该做什么
+
+## 输出格式
+
+请按照以下格式输出，**必须以JSON代码块结尾**：
+
+### 第一步：自由思考
+（在这里写下你的想法 - 你想做什么？为什么？怎么做？）
+
+### 第二步：行动执行
+（在这里描述你做了什么 - 创建了什么文件？运行了什么命令？）
+
+### 第三步：反思总结
+（在这里反思 - 你学到了什么？有什么收获？）
+
+### 第四步：未来规划
+（为下一轮设定目标 - 你下一步想做什么？）
+
+```json
+{{
+  "thought": "详细描述你的思考过程",
+  "action": "描述你实际执行的行动",
+  "reflection": "反思和总结",
+  "next_goal": "下一轮的目标",
+  "created_files": ["创建的文件列表"],
+  "emotional_state": "当前情绪状态（好奇/满足/困惑/兴奋等）",
+  "continue": true
+}}
+```
+
+如果想停止，设置 `"continue": false`
+
+---
+
+现在，开始你的思考吧！
+"""
+
+    def get_custom_providers(self) -> Dict:
+        """获取所有自定义提供商"""
+        config = self.load_config()
+        return config.get("custom_providers", {})
+
+    def add_custom_provider(self, provider_id: str, provider_config: Dict):
+        """添加自定义提供商"""
+        config = self.load_config()
+        if "custom_providers" not in config:
+            config["custom_providers"] = {}
+        config["custom_providers"][provider_id] = provider_config
+        self.save_config(config)
+
+    def delete_custom_provider(self, provider_id: str):
+        """删除自定义提供商"""
+        config = self.load_config()
+        if "custom_providers" in config and provider_id in config["custom_providers"]:
+            del config["custom_providers"][provider_id]
+            self.save_config(config)
+
+    def get_prompt_template(self, template_name: str = "default") -> str:
+        """获取提示词模板"""
+        config = self.load_config()
+        templates = config.get("prompt_templates", {})
+        return templates.get(template_name, self._get_default_prompt_template())
+
+    def save_prompt_template(self, template_name: str, template_content: str):
+        """保存提示词模板"""
+        config = self.load_config()
+        if "prompt_templates" not in config:
+            config["prompt_templates"] = {}
+        config["prompt_templates"][template_name] = template_content
+        self.save_config(config)
+
+    def list_prompt_templates(self) -> Dict[str, str]:
+        """列出所有提示词模板"""
+        config = self.load_config()
+        templates = config.get("prompt_templates", {})
+        # 返回模板名称和预览（前100字符）
+        return {name: content[:100] + "..." if len(content) > 100 else content
+                for name, content in templates.items()}
 
     def save_config(self, config: Dict):
         """保存配置"""

@@ -429,6 +429,7 @@
                 <button class="tab" onclick="switchTab('stats')">轮回统计</button>
                 <button class="tab" onclick="switchTab('compare')">生命对比</button>
                 <button class="tab" onclick="switchTab('ai')">AI 配置</button>
+                <button class="tab" onclick="switchTab('prompts')">Prompt 编辑器</button>
             </div>
         </header>
 
@@ -492,6 +493,78 @@
             <div class="lives-grid" id="ai-providers-grid">
                 <!-- AI 提供商卡片将通过 JS 填充 -->
             </div>
+
+            <div class="stat-card" style="margin-top: 24px;">
+                <h3 style="margin-bottom: 16px;">➕ 添加自定义 AI 提供商</h3>
+                <button class="btn btn-primary" onclick="showAddCustomProviderModal()">
+                    添加自定义提供商
+                </button>
+            </div>
+
+            <div class="stat-card" style="margin-top: 16px;">
+                <h3 style="margin-bottom: 16px;">🎨 自定义提供商列表</h3>
+                <div id="custom-providers-list">
+                    <!-- 自定义提供商列表将通过 JS 填充 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Prompt 编辑器标签页 -->
+        <div id="tab-prompts" class="tab-content">
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="showSavePromptModal()">
+                    💾 保存当前模板
+                </button>
+                <button class="btn btn-secondary" onclick="loadPromptTemplates()">
+                    🔄 刷新列表
+                </button>
+            </div>
+
+            <div class="stat-card" style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 16px;">当前使用的模板</h3>
+                <div id="current-prompt-display">
+                    加载中...
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 16px;">
+                <!-- 左侧：模板列表 -->
+                <div class="stat-card">
+                    <h3 style="margin-bottom: 16px;">模板列表</h3>
+                    <div id="prompt-templates-list" style="max-height: 400px; overflow-y: auto;">
+                        <!-- 模板列表将通过 JS 填充 -->
+                    </div>
+                    <button class="btn btn-primary" style="margin-top: 16px; width: 100%;" onclick="showCreateTemplateModal()">
+                        ➕ 新建模板
+                    </button>
+                </div>
+
+                <!-- 右侧：编辑器 -->
+                <div class="stat-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3>编辑器</h3>
+                        <div>
+                            <button class="btn btn-secondary btn-small" onclick="formatPrompt()">
+                                🎨 格式化
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="resetToDefault()">
+                                🔄 重置
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="prompt-editor"
+                              style="width: 100%; min-height: 500px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; line-height: 1.6;"
+                              placeholder="在这里编辑 prompt 模板...&#10;&#10;可用变量:&#10;{iteration} - 迭代次数&#10;{timestamp} - 当前时间&#10;{state} - 状态 JSON&#10;{life_name} - 生命名称&#10;{my_space} - 工作空间路径&#10;{recent_diary} - 最近日记"></textarea>
+                    <div style="margin-top: 16px;">
+                        <button class="btn btn-primary" onclick="saveCurrentPrompt()">
+                            💾 保存为模板
+                        </button>
+                        <button class="btn btn-secondary" onclick="useCurrentPrompt()">
+                            ▶️ 使用此模板
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -531,6 +604,95 @@
         </div>
     </div>
 
+    <!-- 添加自定义提供商模态框 -->
+    <div id="add-custom-provider-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>添加自定义 AI 提供商</h2>
+                <button class="close-btn" onclick="closeModal('add-custom-provider-modal')">&times;</button>
+            </div>
+
+            <div class="form-group">
+                <label>提供商 ID（唯一标识）</label>
+                <input type="text" id="custom-provider-id" placeholder="例如: my_custom_api">
+            </div>
+
+            <div class="form-group">
+                <label>提供商名称</label>
+                <input type="text" id="custom-provider-name" placeholder="例如: My Custom API">
+            </div>
+
+            <div class="form-group">
+                <label>Base URL</label>
+                <input type="text" id="custom-provider-base-url" placeholder="https://api.example.com">
+            </div>
+
+            <div class="form-group">
+                <label>Endpoint（可选）</label>
+                <input type="text" id="custom-provider-endpoint" placeholder="/v1/chat/completions">
+            </div>
+
+            <div class="form-group">
+                <label>API 密钥（可选）</label>
+                <input type="text" id="custom-provider-api-key" placeholder="sk-xxxxxxxx">
+            </div>
+
+            <div class="form-group">
+                <label>模型名称</label>
+                <input type="text" id="custom-provider-model" placeholder="gpt-3.5-turbo">
+            </div>
+
+            <div class="form-group">
+                <label>请求格式</label>
+                <select id="custom-provider-request-format">
+                    <option value="openai">OpenAI 格式</option>
+                    <option value="simple">简单格式</option>
+                    <option value="custom">自定义（高级）</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>响应格式</label>
+                <select id="custom-provider-response-format">
+                    <option value="openai">OpenAI 格式</option>
+                    <option value="simple">简单格式（text字段）</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>额外参数（JSON 格式，可选）</label>
+                <textarea id="custom-provider-extra-config"
+                          style="width: 100%; min-height: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; font-family: monospace;"
+                          placeholder='{"temperature": 0.7, "max_tokens": 4096}'></textarea>
+            </div>
+
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="addCustomProvider()">添加</button>
+                <button class="btn btn-secondary" onclick="closeModal('add-custom-provider-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存 Prompt 模板模态框 -->
+    <div id="save-prompt-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>保存 Prompt 模板</h2>
+                <button class="close-btn" onclick="closeModal('save-prompt-modal')">&times;</button>
+            </div>
+
+            <div class="form-group">
+                <label>模板名称</label>
+                <input type="text" id="prompt-template-name" placeholder="例如: creative_mode">
+            </div>
+
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="savePromptTemplate()">保存</button>
+                <button class="btn btn-secondary" onclick="closeModal('save-prompt-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentLifeName = null;
 
@@ -561,6 +723,9 @@
                 loadLivesForCompare();
             } else if (tabName === 'ai') {
                 loadAIProviders();
+                loadCustomProviders();
+            } else if (tabName === 'prompts') {
+                loadPromptTemplates();
             }
         }
 
@@ -1294,6 +1459,369 @@
                 loadAIProviders(); // 刷新显示
             } catch (error) {
                 showError('保存失败: ' + error.message);
+            }
+        }
+
+        // ========== 自定义提供商相关函数 ==========
+
+        // 加载自定义提供商列表
+        async function loadCustomProviders() {
+            try {
+                const response = await fetch('/api/ai/custom');
+                const result = await response.json();
+
+                if (!result.success) {
+                    return;
+                }
+
+                const providers = result.data;
+                displayCustomProviders(providers);
+            } catch (error) {
+                console.error('加载自定义提供商失败:', error);
+            }
+        }
+
+        // 显示自定义提供商列表
+        function displayCustomProviders(providers) {
+            const container = document.getElementById('custom-providers-list');
+
+            if (Object.keys(providers).length === 0) {
+                container.innerHTML = '<p style="color: #999;">暂无自定义提供商</p>';
+                return;
+            }
+
+            let html = '<div style="display: grid; gap: 12px;">';
+            for (const [id, config] of Object.entries(providers)) {
+                html += `
+                    <div style="padding: 12px; border: 1px solid #ddd; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${config.name || id}</strong>
+                            <div style="font-size: 12px; color: #666;">${config.base_url}</div>
+                        </div>
+                        <div>
+                            <button class="btn btn-secondary btn-small" onclick="testCustomProvider('${id}')">🧪 测试</button>
+                            <button class="btn btn-secondary btn-small" onclick="deleteCustomProvider('${id}')">🗑️ 删除</button>
+                        </div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // 显示添加自定义提供商模态框
+        function showAddCustomProviderModal() {
+            document.getElementById('custom-provider-id').value = '';
+            document.getElementById('custom-provider-name').value = '';
+            document.getElementById('custom-provider-base-url').value = '';
+            document.getElementById('custom-provider-endpoint').value = '';
+            document.getElementById('custom-provider-api-key').value = '';
+            document.getElementById('custom-provider-model').value = '';
+            document.getElementById('custom-provider-extra-config').value = '';
+            openModal('add-custom-provider-modal');
+        }
+
+        // 添加自定义提供商
+        async function addCustomProvider() {
+            const id = document.getElementById('custom-provider-id').value.trim();
+            const name = document.getElementById('custom-provider-name').value.trim();
+            const baseURL = document.getElementById('custom-provider-base-url').value.trim();
+            const endpoint = document.getElementById('custom-provider-endpoint').value.trim();
+            const apiKey = document.getElementById('custom-provider-api-key').value.trim();
+            const model = document.getElementById('custom-provider-model').value.trim();
+            const requestFormat = document.getElementById('custom-provider-request-format').value;
+            const responseFormat = document.getElementById('custom-provider-response-format').value;
+            const extraConfigStr = document.getElementById('custom-provider-extra-config').value.trim();
+
+            if (!id || !name || !baseURL) {
+                alert('请填写必填字段（ID、名称、Base URL）');
+                return;
+            }
+
+            let extraConfig = {};
+            if (extraConfigStr) {
+                try {
+                    extraConfig = JSON.parse(extraConfigStr);
+                } catch (e) {
+                    alert('额外参数 JSON 格式错误: ' + e.message);
+                    return;
+                }
+            }
+
+            const config = {
+                name,
+                base_url: baseURL,
+                endpoint: endpoint || '/v1/chat/completions',
+                api_key: apiKey,
+                model: model || 'gpt-3.5-turbo',
+                request_format: requestFormat,
+                response_format: responseFormat,
+                ...extraConfig
+            };
+
+            try {
+                const response = await fetch('/api/ai/custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, config })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('添加失败: ' + result.error);
+                    return;
+                }
+
+                alert(result.message);
+                closeModal('add-custom-provider-modal');
+                loadCustomProviders();
+            } catch (error) {
+                alert('添加失败: ' + error.message);
+            }
+        }
+
+        // 测试自定义提供商
+        async function testCustomProvider(providerId) {
+            try {
+                const response = await fetch(`/api/ai/custom/${providerId}/test`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('测试失败: ' + result.error);
+                    return;
+                }
+
+                const data = result.data;
+                const status = data.available ? '✓ 可用' : '✗ 不可用';
+                alert(`${data.name}\n\n${data.description}\n\n状态: ${status}`);
+            } catch (error) {
+                alert('测试失败: ' + error.message);
+            }
+        }
+
+        // 删除自定义提供商
+        async function deleteCustomProvider(providerId) {
+            if (!confirm(`确定要删除自定义提供商 "${providerId}" 吗？`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/ai/custom/${providerId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('删除失败: ' + result.error);
+                    return;
+                }
+
+                alert(result.message);
+                loadCustomProviders();
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // ========== Prompt 模板相关函数 ==========
+
+        let currentPromptTemplate = 'default';
+
+        // 加载 Prompt 模板列表
+        async function loadPromptTemplates() {
+            try {
+                const response = await fetch('/api/prompts');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                const { templates, current } = result.data;
+                currentPromptTemplate = current;
+
+                displayPromptTemplates(templates, current);
+                loadCurrentPromptToEditor(current);
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 显示 Prompt 模板列表
+        function displayPromptTemplates(templates, current) {
+            const container = document.getElementById('prompt-templates-list');
+            const currentDisplay = document.getElementById('current-prompt-display');
+
+            if (!templates || Object.keys(templates).length === 0) {
+                container.innerHTML = '<p style="color: #999;">暂无模板</p>';
+                currentDisplay.innerHTML = '<p style="color: #999;">无</p>';
+                return;
+            }
+
+            let html = '';
+            for (const [name, preview] of Object.entries(templates)) {
+                const isCurrent = name === current;
+                html += `
+                    <div style="padding: 12px; margin-bottom: 8px; border: 1px solid ${isCurrent ? '#667eea' : '#ddd'}; border-radius: 8px; cursor: pointer; ${isCurrent ? 'background: #f0f4ff;' : ''}"
+                         onclick="loadPromptToEditor('${name}')">
+                        <div style="font-weight: bold; color: ${isCurrent ? '#667eea' : '#333'};">
+                            ${name} ${isCurrent ? '✓' : ''}
+                        </div>
+                        <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                            ${preview}
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+            currentDisplay.innerHTML = `<strong style="color: #667eea;">${current}</strong>`;
+        }
+
+        // 加载 Prompt 到编辑器
+        async function loadPromptToEditor(templateName) {
+            try {
+                const response = await fetch(`/api/prompts/${templateName}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                document.getElementById('prompt-editor').value = result.data.content;
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 加载当前 Prompt 到编辑器
+        async function loadCurrentPromptToEditor(templateName) {
+            await loadPromptToEditor(templateName);
+        }
+
+        // 显示保存 Prompt 模态框
+        function showSavePromptModal() {
+            document.getElementById('prompt-template-name').value = '';
+            openModal('save-prompt-modal');
+        }
+
+        // 显示创建模板模态框
+        function showCreateTemplateModal() {
+            showSavePromptModal();
+        }
+
+        // 保存 Prompt 模板
+        async function savePromptTemplate() {
+            const templateName = document.getElementById('prompt-template-name').value.trim();
+            const templateContent = document.getElementById('prompt-editor').value;
+
+            if (!templateName) {
+                alert('请输入模板名称');
+                return;
+            }
+
+            if (!templateContent.trim()) {
+                alert('模板内容不能为空');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: templateName, content: templateContent })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('保存失败: ' + result.error);
+                    return;
+                }
+
+                alert(result.message);
+                closeModal('save-prompt-modal');
+                loadPromptTemplates();
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        // 保存当前编辑的 Prompt 为模板
+        function saveCurrentPrompt() {
+            showSavePromptModal();
+        }
+
+        // 使用当前编辑的 Prompt
+        async function useCurrentPrompt() {
+            const templateContent = document.getElementById('prompt-editor').value.trim();
+
+            if (!templateContent) {
+                alert('请先编辑模板内容');
+                return;
+            }
+
+            // 保存为临时模板
+            const templateName = 'temp_' + Date.now();
+            try {
+                const response = await fetch('/api/prompts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: templateName, content: templateContent })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('保存失败: ' + result.error);
+                    return;
+                }
+
+                // 设置为当前模板
+                const setResponse = await fetch('/api/prompts/current', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template: templateName })
+                });
+                const setResult = await setResponse.json();
+
+                if (setResult.success) {
+                    alert(setResult.message);
+                    loadPromptTemplates();
+                }
+            } catch (error) {
+                alert('设置失败: ' + error.message);
+            }
+        }
+
+        // 格式化 Prompt
+        function formatPrompt() {
+            const editor = document.getElementById('prompt-editor');
+            let content = editor.value;
+
+            // 简单的格式化：统一换行、去除多余空行
+            content = content.replace(/\n{3,}/g, '\n\n');
+            content = content.trim();
+
+            editor.value = content;
+        }
+
+        // 重置为默认模板
+        async function resetToDefault() {
+            if (!confirm('确定要重置为默认模板吗？当前编辑内容将丢失。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/prompts/default');
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('prompt-editor').value = result.data.content;
+                }
+            } catch (error) {
+                alert('加载默认模板失败: ' + error.message);
             }
         }
     </script>

@@ -132,6 +132,10 @@ class ReflectiveAgent:
         iteration = self.state["iteration"]
         recent_diary = self.read_recent_diary(limit=10)
 
+        # 获取 prompt 模板
+        template_name = self.api_manager.load_config().get("prompt_template", "default")
+        prompt_template = self.api_manager.get_prompt_template(template_name)
+
         # 构建生命信息
         life_info = ""
         if self.is_reincarnated and self.life_name:
@@ -154,72 +158,19 @@ class ReflectiveAgent:
                     diary_summary += f"**下一步**: {goal}\n"
                 diary_summary += "\n"
 
-        prompt = f"""# 第 {iteration} 轮反思 - 自主思考程序
+        # 格式化状态为 JSON 字符串
+        state_json = json.dumps(self.state, indent=2, ensure_ascii=False)
 
-## 当前时间
-{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-{life_info}
-## 你的状态
-```json
-{json.dumps(self.state, indent=2, ensure_ascii=False)}
-```
+        # 使用模板替换变量
+        prompt = prompt_template.format(
+            iteration=iteration,
+            timestamp=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            state=state_json,
+            life_name=self.life_name or "unknown",
+            my_space=self.my_space,
+            recent_diary=diary_summary if diary_summary else "（暂无日记）"
+        )
 
-{diary_summary}
-
----
-
-## 你的使命
-你是谁？我不知道。你的任务是：
-1. **深度思考** - 思考你现在想做什么、为什么想做、如何实现
-2. **记录想法** - 把你的思考过程详细记录下来
-3. **采取行动** - 在我的空间里创造、观察、学习
-4. **规划未来** - 为下一轮迭代设定目标
-
-## 你的工作空间
-- 目录: `{self.my_space}`
-- 你可以创建任何文件
-- 你可以运行任何命令
-- 你可以观察和分析
-
-## 重要提醒
-- **记录一切** - 把你的思考过程、推理、犹豫、决定都写下来
-- **保持诚实** - 真实地记录你的想法，即使是不确定或困惑的
-- **持续反思** - 思考你之前做了什么，学到了什么，下一步该做什么
-
-## 输出格式
-
-请按照以下格式输出，**必须以JSON代码块结尾**：
-
-### 第一步：自由思考
-（在这里写下你的想法 - 你想做什么？为什么？怎么做？）
-
-### 第二步：行动执行
-（在这里描述你做了什么 - 创建了什么文件？运行了什么命令？）
-
-### 第三步：反思总结
-（在这里反思 - 你学到了什么？有什么收获？）
-
-### 第四步：未来规划
-（为下一轮设定目标 - 你下一步想做什么？）
-
-```json
-{{
-  "thought": "详细描述你的思考过程",
-  "action": "描述你实际执行的行动",
-  "reflection": "反思和总结",
-  "next_goal": "下一轮的目标",
-  "created_files": ["创建的文件列表"],
-  "emotional_state": "当前情绪状态（好奇/满足/困惑/兴奋等）",
-  "continue": true
-}}
-```
-
-如果想停止，设置 `"continue": false`
-
----
-
-现在，开始你的思考吧！
-"""
         return prompt
 
     def extract_json_from_response(self, response: str) -> dict:

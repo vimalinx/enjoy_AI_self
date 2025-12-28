@@ -360,6 +360,183 @@ def _check_provider_available(provider_type, config):
         return False
 
 
+# 自定义提供商 API
+@app.route('/api/ai/custom', methods=['GET'])
+def api_list_custom_providers():
+    """列出所有自定义提供商"""
+    custom_providers = ai_manager.get_custom_providers()
+    return jsonify({
+        'success': True,
+        'data': custom_providers
+    })
+
+
+@app.route('/api/ai/custom', methods=['POST'])
+def api_add_custom_provider():
+    """添加自定义提供商"""
+    data = request.get_json()
+    provider_id = data.get('id')
+    provider_config = data.get('config')
+
+    if not provider_id or not provider_config:
+        return jsonify({
+            'success': False,
+            'error': '缺少提供商 ID 或配置'
+        }), 400
+
+    try:
+        ai_manager.add_custom_provider(provider_id, provider_config)
+        return jsonify({
+            'success': True,
+            'message': f'自定义提供商 {provider_id} 已添加'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/ai/custom/<provider_id>', methods=['DELETE'])
+def api_delete_custom_provider(provider_id):
+    """删除自定义提供商"""
+    try:
+        ai_manager.delete_custom_provider(provider_id)
+        return jsonify({
+            'success': True,
+            'message': f'自定义提供商 {provider_id} 已删除'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/ai/custom/<provider_id>/test', methods=['POST'])
+def api_test_custom_provider(provider_id):
+    """测试自定义提供商"""
+    try:
+        custom_providers = ai_manager.get_custom_providers()
+        if provider_id not in custom_providers:
+            return jsonify({
+                'success': False,
+                'error': f'自定义提供商 {provider_id} 不存在'
+            }), 404
+
+        provider_config = custom_providers[provider_id]
+        provider = AIProviderFactory.get_provider(
+            f"custom_{provider_id}",
+            api_key=provider_config.get('api_key'),
+            config=provider_config
+        )
+
+        available = provider.is_available()
+        return jsonify({
+            'success': True,
+            'data': {
+                'provider': provider_id,
+                'name': provider.get_name(),
+                'description': provider.get_description(),
+                'available': available
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+# Prompt 模板 API
+@app.route('/api/prompts', methods=['GET'])
+def api_list_prompt_templates():
+    """列出所有提示词模板"""
+    templates = ai_manager.list_prompt_templates()
+    config = ai_manager.load_config()
+    current_template = config.get('prompt_template', 'default')
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'templates': templates,
+            'current': current_template
+        }
+    })
+
+
+@app.route('/api/prompts/<template_name>', methods=['GET'])
+def api_get_prompt_template(template_name):
+    """获取提示词模板内容"""
+    try:
+        content = ai_manager.get_prompt_template(template_name)
+        return jsonify({
+            'success': True,
+            'data': {
+                'name': template_name,
+                'content': content
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/prompts', methods=['POST'])
+def api_save_prompt_template():
+    """保存提示词模板"""
+    data = request.get_json()
+    template_name = data.get('name')
+    template_content = data.get('content')
+
+    if not template_name or template_content is None:
+        return jsonify({
+            'success': False,
+            'error': '缺少模板名称或内容'
+        }), 400
+
+    try:
+        ai_manager.save_prompt_template(template_name, template_content)
+        return jsonify({
+            'success': True,
+            'message': f'提示词模板 {template_name} 已保存'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/prompts/current', methods=['POST'])
+def api_set_current_prompt_template():
+    """设置当前提示词模板"""
+    data = request.get_json()
+    template_name = data.get('template')
+
+    if not template_name:
+        return jsonify({
+            'success': False,
+            'error': '缺少模板名称'
+        }), 400
+
+    try:
+        config = ai_manager.load_config()
+        config['prompt_template'] = template_name
+        ai_manager.save_config(config)
+        return jsonify({
+            'success': True,
+            'message': f'已设置 {template_name} 为当前模板'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
 def main():
     import argparse
 
