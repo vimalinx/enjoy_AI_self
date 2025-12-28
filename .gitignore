@@ -49,6 +49,9 @@ old_*/
 *.backup
 my_space_backup*/
 
+# AI 配置（包含 API 密钥）
+ai_config.json
+
 # 临时文件
 *.tmp
 *.bak

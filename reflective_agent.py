@@ -12,13 +12,19 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+from ai_providers import AIProviderFactory, APIKeyManager
 
 
 class ReflectiveAgent:
     """反思型自主代理 - 记录所思所想"""
 
-    def __init__(self, work_dir: str = None):
+    def __init__(self, work_dir: str = None, ai_provider: str = None):
         self.work_dir = Path(work_dir) if work_dir else Path(__file__).parent
+
+        # AI 提供商设置
+        self.api_manager = APIKeyManager(work_dir=self.work_dir)
+        self.ai_provider_type = ai_provider or self.api_manager.get_default_provider()
+        self._setup_ai_provider()
 
         # 工作空间（所有数据都存在这里）
         self.my_space = self.work_dir / "my_space"
@@ -46,6 +52,22 @@ class ReflectiveAgent:
 
         # 加载状态
         self.state = self._load_state()
+
+    def _setup_ai_provider(self):
+        """设置 AI 提供商"""
+        provider_config = self.api_manager.get_provider_config(self.ai_provider_type)
+
+        # 提取 API 密钥
+        api_key = provider_config.get("api_key")
+
+        # 创建提供商实例
+        self.ai_provider = AIProviderFactory.get_provider(
+            self.ai_provider_type,
+            api_key=api_key,
+            config=provider_config
+        )
+
+        self._log(f"使用 AI 提供商: {self.ai_provider.get_name()}")
 
     def _load_state(self) -> dict:
         """加载状态"""
@@ -263,23 +285,18 @@ class ReflectiveAgent:
             "prompt_length": len(prompt)
         })
 
-        # 调用 claude
-        self._log("正在调用 Claude API...")
+        # 调用 AI
+        self._log(f"正在调用 {self.ai_provider.get_name()}...")
         try:
-            # 读取提示词内容并通过 stdin 传递
+            # 读取提示词内容
             prompt_content = self.prompt_file.read_text(encoding='utf-8')
-            result = subprocess.run(
-                ["claude", "--permission-mode", "bypassPermissions"],
-                input=prompt_content,
-                capture_output=True,
-                text=True,
-                timeout=600  # 10分钟超时
-            )
 
-            response = result.stdout
+            # 使用 AI 提供商生成响应
+            response = self.ai_provider.generate(prompt_content, timeout=600)
+
             self.response_file.write_text(response, encoding='utf-8')
 
-            self._log(f"Claude 响应: {len(response)} 字符")
+            self._log(f"AI 响应: {len(response)} 字符")
 
             self.write_diary({
                 "phase": "RESPONSE_RECEIVED",
@@ -430,10 +447,11 @@ def main():
     parser = argparse.ArgumentParser(description="反思型自主代理")
     parser.add_argument("--work-dir", "-w", help="工作目录")
     parser.add_argument("--max-iterations", "-n", type=int, help="最大迭代次数")
+    parser.add_argument("--ai", "-a", help="AI 提供商 (claude, openai, openai_compatible, ollama)")
 
     args = parser.parse_args()
 
-    agent = ReflectiveAgent(work_dir=args.work_dir)
+    agent = ReflectiveAgent(work_dir=args.work_dir, ai_provider=args.ai)
     agent.run(max_iterations=args.max_iterations)
 
 

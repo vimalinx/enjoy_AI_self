@@ -428,6 +428,7 @@
                 <button class="tab active" onclick="switchTab('lives')">生命列表</button>
                 <button class="tab" onclick="switchTab('stats')">轮回统计</button>
                 <button class="tab" onclick="switchTab('compare')">生命对比</button>
+                <button class="tab" onclick="switchTab('ai')">AI 配置</button>
             </div>
         </header>
 
@@ -474,6 +475,23 @@
             </div>
 
             <div id="comparison-result"></div>
+        </div>
+
+        <!-- AI 配置标签页 -->
+        <div id="tab-ai" class="tab-content">
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="saveAIConfig()">💾 保存配置</button>
+                <button class="btn btn-secondary" onclick="loadAIProviders()">🔄 刷新</button>
+            </div>
+
+            <div class="stat-card" style="margin-bottom: 24px;">
+                <h3 style="margin-bottom: 16px;">当前默认提供商</h3>
+                <div id="default-provider-display">加载中...</div>
+            </div>
+
+            <div class="lives-grid" id="ai-providers-grid">
+                <!-- AI 提供商卡片将通过 JS 填充 -->
+            </div>
         </div>
     </div>
 
@@ -541,6 +559,8 @@
                 loadReincarnationStats();
             } else if (tabName === 'compare') {
                 loadLivesForCompare();
+            } else if (tabName === 'ai') {
+                loadAIProviders();
             }
         }
 
@@ -990,6 +1010,292 @@
                 }
             });
         });
+
+        // AI 配置相关函数
+        let aiProvidersData = [];
+        let aiConfigData = {};
+
+        // 加载 AI 提供商
+        async function loadAIProviders() {
+            try {
+                const response = await fetch('/api/ai/providers');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                aiProvidersData = result.data;
+                displayAIProviders(aiProvidersData);
+                loadAIConfig();
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 显示 AI 提供商
+        function displayAIProviders(providers) {
+            const grid = document.getElementById('ai-providers-grid');
+            grid.innerHTML = '';
+
+            providers.forEach(provider => {
+                const card = document.createElement('div');
+                card.className = 'life-card';
+                if (provider.key === 'claude') {
+                    card.classList.add('current');
+                }
+
+                const statusColor = provider.available ? '#388e3c' : '#d32f2f';
+                const statusText = provider.available ? '✓ 可用' : '✗ 不可用';
+
+                card.innerHTML = `
+                    <h3>${provider.name}</h3>
+                    <div style="margin: 12px 0;">
+                        <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox"
+                                   id="ai-enabled-${provider.key}"
+                                   ${provider.enabled ? 'checked' : ''}
+                                   onchange="updateProviderEnabled('${provider.key}')">
+                            启用此提供商
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>API 密钥 / 配置</label>
+                        <textarea id="ai-config-${provider.key}"
+                                  placeholder="${getPlaceholderForProvider(provider.key)}"
+                                  style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 12px;"
+                                  onchange="markProviderConfigChanged('${provider.key}')"></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-top: 12px;">
+                        <button class="btn btn-secondary btn-small" onclick="testAIProvider('${provider.key}')">
+                            🧪 测试
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="setAsDefault('${provider.key}')">
+                            ⭐ 设为默认
+                        </button>
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        // 获取提供商配置占位符
+        function getPlaceholderForProvider(providerKey) {
+            const placeholders = {
+                'claude': 'Claude CLI 无需配置',
+                'openai': '输入 OpenAI API 密钥\n模型: gpt-4, gpt-3.5-turbo',
+                'openai_compatible': 'API 密钥\nBase URL: http://localhost:8000\n模型: gpt-3.5-turbo',
+                'ollama': 'Base URL: http://localhost:11434\n模型: llama2, mistral, etc.'
+            };
+            return placeholders[providerKey] || '输入配置信息';
+        }
+
+        // 加载 AI 配置
+        async function loadAIConfig() {
+            try {
+                const response = await fetch('/api/ai/config');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                aiConfigData = result.data;
+
+                // 显示默认提供商
+                const defaultProvider = aiConfigData.default_provider || 'claude';
+                document.getElementById('default-provider-display').innerHTML =
+                    `<strong style="color: #667eea; font-size: 18px;">${getDefaultProviderName(defaultProvider)}</strong>`;
+
+                // 填充配置
+                const providers = aiConfigData.providers || {};
+                for (const [key, config] of Object.entries(providers)) {
+                    const textarea = document.getElementById(`ai-config-${key}`);
+                    if (textarea && config) {
+                        const configText = formatConfigForDisplay(key, config);
+                        textarea.value = configText;
+                    }
+                }
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 格式化配置用于显示
+        function formatConfigForDisplay(providerKey, config) {
+            if (!config) return '';
+
+            const lines = [];
+            if (config.api_key) lines.push(`API_KEY=${config.api_key}`);
+            if (config.base_url) lines.push(`BASE_URL=${config.base_url}`);
+            if (config.model) lines.push(`MODEL=${config.model}`);
+            if (config.temperature) lines.push(`TEMPERATURE=${config.temperature}`);
+            if (config.max_tokens) lines.push(`MAX_TOKENS=${config.max_tokens}`);
+
+            return lines.join('\n');
+        }
+
+        // 解析配置文本
+        function parseConfigText(text) {
+            const config = {};
+            const lines = text.split('\n');
+
+            lines.forEach(line => {
+                const match = line.match(/^(\w+)=(.+)$/);
+                if (match) {
+                    const key = match[1].toLowerCase();
+                    const value = match[2].trim();
+
+                    if (key === 'api_key') config.api_key = value;
+                    else if (key === 'base_url') config.base_url = value;
+                    else if (key === 'model') config.model = value;
+                    else if (key === 'temperature') config.temperature = parseFloat(value);
+                    else if (key === 'max_tokens') config.max_tokens = parseInt(value);
+                } else if (line.trim() && !line.includes('=')) {
+                    // 简单的 API key
+                    if (!config.api_key) config.api_key = line.trim();
+                }
+            });
+
+            return config;
+        }
+
+        // 获取默认提供商名称
+        function getDefaultProviderName(providerKey) {
+            const names = {
+                'claude': 'Claude (CLI)',
+                'openai': 'OpenAI GPT',
+                'openai_compatible': 'OpenAI 兼容 API',
+                'ollama': 'Ollama (本地)'
+            };
+            return names[providerKey] || providerKey;
+        }
+
+        // 测试 AI 提供商
+        async function testAIProvider(providerKey) {
+            try {
+                const response = await fetch('/api/ai/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ provider: providerKey })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    alert('测试失败: ' + result.error);
+                    return;
+                }
+
+                const data = result.data;
+                const status = data.available ? '✓ 可用' : '✗ 不可用';
+                alert(`${data.name}\n\n${data.description}\n\n状态: ${status}`);
+            } catch (error) {
+                alert('测试失败: ' + error.message);
+            }
+        }
+
+        // 设置为默认
+        async function setAsDefault(providerKey) {
+            try {
+                const response = await fetch('/api/ai/default', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ provider: providerKey })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('设置失败: ' + result.error);
+                    return;
+                }
+
+                alert(result.message);
+                loadAIConfig();
+            } catch (error) {
+                showError('设置失败: ' + error.message);
+            }
+        }
+
+        // 标记提供商配置已更改
+        function markProviderConfigChanged(providerKey) {
+            // 配置将在保存时更新
+        }
+
+        // 更新提供商启用状态
+        async function updateProviderEnabled(providerKey) {
+            const enabled = document.getElementById(`ai-enabled-${providerKey}`).checked;
+
+            if (!aiConfigData.providers) {
+                aiConfigData.providers = {};
+            }
+            if (!aiConfigData.providers[providerKey]) {
+                aiConfigData.providers[providerKey] = {};
+            }
+            aiConfigData.providers[providerKey].enabled = enabled;
+        }
+
+        // 保存 AI 配置
+        async function saveAIConfig() {
+            try {
+                // 收集所有提供商的配置
+                for (const provider of aiProvidersData) {
+                    const key = provider.key;
+                    const textarea = document.getElementById(`ai-config-${key}`);
+                    const enabledCheckbox = document.getElementById(`ai-enabled-${key}`);
+
+                    if (!aiConfigData.providers) {
+                        aiConfigData.providers = {};
+                    }
+                    if (!aiConfigData.providers[key]) {
+                        aiConfigData.providers[key] = {};
+                    }
+
+                    // 解析配置
+                    if (textarea && textarea.value.trim()) {
+                        const parsedConfig = parseConfigText(textarea.value);
+                        Object.assign(aiConfigData.providers[key], parsedConfig);
+                    }
+
+                    // 更新启用状态
+                    if (enabledCheckbox) {
+                        aiConfigData.providers[key].enabled = enabledCheckbox.checked;
+                    }
+                }
+
+                // 保存到服务器
+                const response = await fetch('/api/ai/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(aiConfigData)
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('保存失败: ' + result.error);
+                    return;
+                }
+
+                alert('配置已保存！');
+                loadAIProviders(); // 刷新显示
+            } catch (error) {
+                showError('保存失败: ' + error.message);
+            }
+        }
     </script>
 </body>
 </html>

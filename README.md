@@ -11,6 +11,7 @@
 - **完整记录**：记录所有思考过程、推理、犹豫和决定
 - **持续迭代**：不断反思、学习、规划未来
 - **真实行动**：创建文件、运行命令、观察结果
+- **多 AI 支持**：支持 Claude、OpenAI、Ollama 等多个 AI 提供商
 
 ### 🔄 轮回隔离系统
 - **完全隔离**：每个生命独立，无记忆传递
@@ -60,6 +61,7 @@ pip install flask
 
 - [轮回隔离系统指南](REINCARNATION_README.md) - 轮回系统的详细使用方法
 - [Web 面板指南](WEB_DASHBOARD_README.md) - Web 界面完整文档
+- [AI 提供商配置指南](AI_PROVIDERS_README.md) - 配置多个 AI 提供商
 
 ## 🏗️ 项目结构
 
@@ -68,6 +70,7 @@ enjoy_your_self/
 ├── reflective_agent.py         # 反思型自主代理
 ├── observer.py                 # 观察者程序（实时监控）
 ├── reincarnation_manager.py    # 轮回管理器
+├── ai_providers.py            # AI 提供商抽象层
 ├── web_dashboard.py           # Web 服务器
 ├── templates/
 │   └── dashboard.html         # Web 前端界面
@@ -93,7 +96,24 @@ enjoy_your_self/
 # 按 Ctrl+C 停止
 ```
 
-### 2. 轮回实验
+### 2. 使用不同 AI 提供商
+
+```bash
+# 使用默认提供商 (Claude CLI)
+./run_reflective.sh
+
+# 使用 OpenAI
+python3 reflective_agent.py --ai openai
+
+# 使用本地 Ollama 模型
+python3 reflective_agent.py --ai ollama
+
+# 在 Web 面板配置和切换
+./run_web.sh
+# 打开 http://localhost:5000 -> AI 配置标签页
+```
+
+### 3. 轮回实验
 
 ```bash
 # 创建多个生命
@@ -111,7 +131,7 @@ enjoy_your_self/
 ./run_reflective.sh stats
 ```
 
-### 3. Web 管理
+### 4. Web 管理
 
 ```bash
 # 启动 Web 面板

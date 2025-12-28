@@ -10,8 +10,9 @@ import json
 import os
 from datetime import datetime
 
-# 导入轮回管理器
+# 导入轮回管理器和AI提供商
 from reincarnation_manager import ReincarnationManager
+from ai_providers import AIProviderFactory, APIKeyManager
 
 app = Flask(__name__)
 app.jinja_env.globals['now'] = datetime.now
@@ -19,6 +20,7 @@ app.jinja_env.globals['now'] = datetime.now
 # 获取工作目录
 WORK_DIR = Path(__file__).parent
 manager = ReincarnationManager(work_dir=WORK_DIR)
+ai_manager = APIKeyManager(work_dir=WORK_DIR)
 
 
 @app.route('/')
@@ -212,6 +214,150 @@ def api_diary_entry():
         'success': False,
         'error': '未找到该日记条目'
     }), 404
+
+
+# AI 配置相关 API
+@app.route('/api/ai/providers')
+def api_ai_providers():
+    """获取所有 AI 提供商"""
+    providers = AIProviderFactory.list_providers()
+    config = ai_manager.load_config()
+
+    provider_list = []
+    for key, name in providers.items():
+        provider_config = config.get('providers', {}).get(key, {})
+        provider_list.append({
+            'key': key,
+            'name': name,
+            'enabled': provider_config.get('enabled', key == 'claude'),
+            'available': _check_provider_available(key, provider_config)
+        })
+
+    return jsonify({
+        'success': True,
+        'data': provider_list
+    })
+
+
+@app.route('/api/ai/config')
+def api_ai_config():
+    """获取 AI 配置"""
+    config = ai_manager.load_config()
+    return jsonify({
+        'success': True,
+        'data': config
+    })
+
+
+@app.route('/api/ai/config', methods=['POST'])
+def api_update_ai_config():
+    """更新 AI 配置"""
+    data = request.get_json()
+
+    try:
+        ai_manager.save_config(data)
+        return jsonify({
+            'success': True,
+            'message': '配置已更新'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/ai/provider/<provider_type>/config', methods=['POST'])
+def api_update_provider_config(provider_type):
+    """更新特定提供商的配置"""
+    data = request.get_json()
+
+    try:
+        ai_manager.update_provider_config(provider_type, data)
+        return jsonify({
+            'success': True,
+            'message': f'{provider_type} 配置已更新'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/ai/default', methods=['POST'])
+def api_set_default_provider():
+    """设置默认提供商"""
+    data = request.get_json()
+    provider_type = data.get('provider')
+
+    if not provider_type:
+        return jsonify({
+            'success': False,
+            'error': '缺少提供商类型'
+        }), 400
+
+    try:
+        ai_manager.set_default_provider(provider_type)
+        return jsonify({
+            'success': True,
+            'message': f'已设置 {provider_type} 为默认提供商'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/ai/test', methods=['POST'])
+def api_test_provider():
+    """测试提供商"""
+    data = request.get_json()
+    provider_type = data.get('provider')
+
+    if not provider_type:
+        return jsonify({
+            'success': False,
+            'error': '缺少提供商类型'
+        }), 400
+
+    try:
+        provider_config = ai_manager.get_provider_config(provider_type)
+        provider = AIProviderFactory.get_provider(
+            provider_type,
+            api_key=provider_config.get('api_key'),
+            config=provider_config
+        )
+
+        available = provider.is_available()
+        return jsonify({
+            'success': True,
+            'data': {
+                'provider': provider_type,
+                'name': provider.get_name(),
+                'description': provider.get_description(),
+                'available': available
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+def _check_provider_available(provider_type, config):
+    """检查提供商是否可用"""
+    try:
+        provider = AIProviderFactory.get_provider(
+            provider_type,
+            api_key=config.get('api_key'),
+            config=config
+        )
+        return provider.is_available()
+    except:
+        return False
 
 
 def main():
