@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轮回系统面板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: #e0e0e0;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .lives-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .life-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .life-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .life-card.current {
+            border: 2px solid #667eea;
+        }
+
+        .life-card .current-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .life-card h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .life-card .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .life-card .stat {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .life-card .stat strong {
+            color: #333;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .diary-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .diary-entry {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .diary-entry .phase {
+            font-size: 12px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+
+        .diary-entry .summary {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .diary-entry .timestamp {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .diary-entry .details {
+            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .comparison-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .comparison-table tr:hover {
+            background: #f9f9f9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .phase-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        .phase-thinking { background: #e3f2fd; color: #1976d2; }
+        .phase-action { background: #fff3e0; color: #f57c00; }
+        .phase-reflection { background: #e8f5e9; color: #388e3c; }
+        .phase-error { background: #ffebee; color: #d32f2f; }
+        .phase-iteration_start { background: #f3e5f5; color: #7b1fa2; }
+        .phase-iteration_end { background: #e0f2f1; color: #00796b; }
+
+        @media (max-width: 768px) {
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .lives-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 轮回系统面板</h1>
+            <p class="subtitle">管理反思型自主代理的生命周期</p>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('lives')">生命列表</button>
+                <button class="tab" onclick="switchTab('stats')">轮回统计</button>
+                <button class="tab" onclick="switchTab('compare')">生命对比</button>
+            </div>
+        </header>
+
+        <!-- 生命列表标签页 -->
+        <div id="tab-lives" class="tab-content active">
+            <div class="stats-cards" id="lives-stats-cards">
+                <!-- 统计卡片将通过 JS 填充 -->
+            </div>
+
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="showCreateLifeModal()">
+                    ➕ 创建新生命
+                </button>
+                <button class="btn btn-secondary" onclick="loadLives()">
+                    🔄 刷新
+                </button>
+            </div>
+
+            <div class="lives-grid" id="lives-grid">
+                <!-- 生命卡片将通过 JS 填充 -->
+            </div>
+        </div>
+
+        <!-- 轮回统计标签页 -->
+        <div id="tab-stats" class="tab-content">
+            <div class="stats-cards" id="reincarnation-stats-cards">
+                <!-- 轮回统计卡片将通过 JS 填充 -->
+            </div>
+        </div>
+
+        <!-- 生命对比标签页 -->
+        <div id="tab-compare" class="tab-content">
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="compareSelectedLives()">
+                    📊 对比选中生命
+                </button>
+                <button class="btn btn-secondary" onclick="loadLivesForCompare()">
+                    🔄 刷新列表
+                </button>
+            </div>
+
+            <div class="checkbox-group" id="compare-checkboxes">
+                <!-- 复选框将通过 JS 填充 -->
+            </div>
+
+            <div id="comparison-result"></div>
+        </div>
+    </div>
+
+    <!-- 创建生命模态框 -->
+    <div id="create-life-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>创建新生命</h2>
+                <button class="close-btn" onclick="closeModal('create-life-modal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>生命名称（可选）</label>
+                <input type="text" id="new-life-name" placeholder="留空自动命名（如：life_003）">
+            </div>
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="createLife()">创建</button>
+                <button class="btn btn-secondary" onclick="closeModal('create-life-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 生命详情模态框 -->
+    <div id="life-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="life-detail-title">生命详情</h2>
+                <button class="close-btn" onclick="closeModal('life-detail-modal')">&times;</button>
+            </div>
+            <div id="life-detail-content">
+                <!-- 详情将通过 JS 填充 -->
+            </div>
+            <div class="toolbar" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="loadLifeDiary()">加载日记</button>
+                <button class="btn btn-secondary" onclick="switchToCurrentLife()">切换到此生命</button>
+                <button class="btn btn-secondary" onclick="closeModal('life-detail-modal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLifeName = null;
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLives();
+            loadReincarnationStats();
+        });
+
+        // 切换标签页
+        function switchTab(tabName) {
+            // 隐藏所有标签页
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // 显示选中的标签页
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // 加载对应数据
+            if (tabName === 'stats') {
+                loadReincarnationStats();
+            } else if (tabName === 'compare') {
+                loadLivesForCompare();
+            }
+        }
+
+        // 加载生命列表
+        async function loadLives() {
+            try {
+                const response = await fetch('/api/lives');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                const lives = result.data;
+                displayLives(lives);
+                updateLivesStats(lives);
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 显示生命卡片
+        function displayLives(lives) {
+            const grid = document.getElementById('lives-grid');
+            grid.innerHTML = '';
+
+            if (lives.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">暂无生命</p>';
+                return;
+            }
+
+            lives.forEach(life => {
+                const card = document.createElement('div');
+                card.className = 'life-card';
+                if (life.is_current) {
+                    card.classList.add('current');
+                }
+
+                const createdTime = new Date(life.created_at).toLocaleString('zh-CN');
+
+                card.innerHTML = `
+                    ${life.is_current ? '<span class="current-badge">当前</span>' : ''}
+                    <h3>${life.name}</h3>
+                    <div class="stats">
+                        <div class="stat"><strong>编号:</strong> ${life.number}</div>
+                        <div class="stat"><strong>迭代:</strong> ${life.iterations}</div>
+                        <div class="stat"><strong>思考:</strong> ${life.thoughts}</div>
+                        <div class="stat"><strong>行动:</strong> ${life.actions}</div>
+                        <div class="stat"><strong>日记:</strong> ${life.diary_entries} 条</div>
+                        <div class="stat"><strong>创建:</strong> ${createdTime}</div>
+                    </div>
+                `;
+
+                card.onclick = () => showLifeDetail(life.name);
+                grid.appendChild(card);
+            });
+        }
+
+        // 更新生命统计
+        function updateLivesStats(lives) {
+            const container = document.getElementById('lives-stats-cards');
+
+            const totalLives = lives.length;
+            const totalIterations = lives.reduce((sum, l) => sum + l.iterations, 0);
+            const totalThoughts = lives.reduce((sum, l) => sum + l.thoughts, 0);
+            const totalActions = lives.reduce((sum, l) => sum + l.actions, 0);
+            const currentLife = lives.find(l => l.is_current)?.name || '无';
+
+            container.innerHTML = `
+                <div class="stat-card">
+                    <h3>总生命数</h3>
+                    <div class="value">${totalLives}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总迭代次数</h3>
+                    <div class="value">${totalIterations}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总思考次数</h3>
+                    <div class="value">${totalThoughts}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总行动次数</h3>
+                    <div class="value">${totalActions}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>当前生命</h3>
+                    <div class="value" style="font-size: 20px;">${currentLife}</div>
+                </div>
+            `;
+        }
+
+        // 加载轮回统计
+        async function loadReincarnationStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                const stats = result.data;
+                displayReincarnationStats(stats);
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 显示轮回统计
+        function displayReincarnationStats(stats) {
+            const container = document.getElementById('reincarnation-stats-cards');
+
+            container.innerHTML = `
+                <div class="stat-card">
+                    <h3>总生命数</h3>
+                    <div class="value">${stats.total_lives}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总迭代次数</h3>
+                    <div class="value">${stats.total_iterations}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总思考次数</h3>
+                    <div class="value">${stats.total_thoughts}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总行动次数</h3>
+                    <div class="value">${stats.total_actions}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>总日记条数</h3>
+                    <div class="value">${stats.total_diary_entries}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>平均迭代次数</h3>
+                    <div class="value">${stats.avg_iterations.toFixed(1)}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>最长生命</h3>
+                    <div class="value" style="font-size: 20px;">${stats.longest_life || '无'}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>当前生命</h3>
+                    <div class="value" style="font-size: 20px;">${stats.current_life || '无'}</div>
+                </div>
+            `;
+        }
+
+        // 显示生命详情
+        async function showLifeDetail(lifeName) {
+            currentLifeName = lifeName;
+
+            try {
+                const response = await fetch(`/api/lives/${lifeName}`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                const data = result.data;
+                document.getElementById('life-detail-title').textContent = `生命详情: ${lifeName}`;
+
+                const state = data.state;
+                const metadata = data.metadata;
+
+                document.getElementById('life-detail-content').innerHTML = `
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 10px;">基本信息</h3>
+                        <p><strong>生命编号:</strong> ${metadata.number || 'N/A'}</p>
+                        <p><strong>创建时间:</strong> ${new Date(metadata.created_at).toLocaleString('zh-CN')}</p>
+                        <p><strong>状态:</strong> ${metadata.status || 'N/A'}</p>
+                        <p><strong>隔离模式:</strong> ${metadata.isolation_mode || 'N/A'}</p>
+                        <p><strong>是否当前:</strong> ${data.is_current ? '是' : '否'}</p>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 10px;">统计数据</h3>
+                        <p><strong>迭代次数:</strong> ${state.iteration || 0}</p>
+                        <p><strong>思考次数:</strong> ${state.total_thoughts || 0}</p>
+                        <p><strong>行动次数:</strong> ${state.total_actions || 0}</p>
+                        <p><strong>日记条数:</strong> ${data.diary_count || 0}</p>
+                    </div>
+
+                    ${state.goals && state.goals.length > 0 ? `
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="margin-bottom: 10px;">最近目标</h3>
+                            <ul style="padding-left: 20px;">
+                                ${state.goals.slice(-5).map(g => `<li>${g}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${state.achievements && state.achievements.length > 0 ? `
+                        <div style="margin-bottom: 20px;">
+                            <h3 style="margin-bottom: 10px;">最近成就</h3>
+                            <ul style="padding-left: 20px;">
+                                ${state.achievements.slice(-5).map(a => `<li>${a}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    <div id="life-diary-container"></div>
+                `;
+
+                openModal('life-detail-modal');
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 加载生命日记
+        async function loadLifeDiary() {
+            if (!currentLifeName) return;
+
+            try {
+                const response = await fetch(`/api/lives/${currentLifeName}/diary?limit=20`);
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                const entries = result.data;
+                const container = document.getElementById('life-diary-container');
+
+                if (entries.length === 0) {
+                    container.innerHTML = '<p style="color: #999;">暂无日记</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <h3 style="margin-bottom: 10px;">最近日记 (${entries.length} 条)</h3>
+                    <div class="diary-list">
+                        ${entries.map(entry => {
+                            const phaseClass = 'phase-' + entry.phase.toLowerCase().replace('_', '-');
+                            const timestamp = new Date(entry.timestamp).toLocaleString('zh-CN');
+
+                            let details = '';
+                            if (entry.thought) details += `<p><strong>思考:</strong> ${entry.thought}</p>`;
+                            if (entry.action) details += `<p><strong>行动:</strong> ${entry.action}</p>`;
+                            if (entry.reflection) details += `<p><strong>反思:</strong> ${entry.reflection}</p>`;
+                            if (entry.next_goal) details += `<p><strong>下一步:</strong> ${entry.next_goal}</p>`;
+
+                            return `
+                                <div class="diary-entry">
+                                    <span class="phase-badge ${phaseClass}">${entry.phase}</span>
+                                    <div class="summary">${entry.summary || ''}</div>
+                                    <div class="timestamp">${timestamp}</div>
+                                    ${details ? `<div class="details">${details}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 切换到当前生命
+        async function switchToCurrentLife() {
+            if (!currentLifeName) return;
+
+            try {
+                const response = await fetch(`/api/lives/${currentLifeName}/switch`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('切换失败: ' + result.error);
+                    return;
+                }
+
+                alert(result.message);
+                closeModal('life-detail-modal');
+                loadLives();
+            } catch (error) {
+                showError('切换失败: ' + error.message);
+            }
+        }
+
+        // 加载生命列表（用于对比）
+        async function loadLivesForCompare() {
+            try {
+                const response = await fetch('/api/lives');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('加载失败: ' + result.error);
+                    return;
+                }
+
+                const lives = result.data;
+                displayCompareCheckboxes(lives);
+            } catch (error) {
+                showError('加载失败: ' + error.message);
+            }
+        }
+
+        // 显示对比复选框
+        function displayCompareCheckboxes(lives) {
+            const container = document.getElementById('compare-checkboxes');
+            container.innerHTML = lives.map(life => `
+                <div class="checkbox-item">
+                    <input type="checkbox" id="compare-${life.name}" value="${life.name}">
+                    <label for="compare-${life.name}">${life.name} (${life.iterations} 次迭代)</label>
+                </div>
+            `).join('');
+        }
+
+        // 对比选中的生命
+        async function compareSelectedLives() {
+            const checkboxes = document.querySelectorAll('#compare-checkboxes input[type="checkbox"]:checked');
+
+            if (checkboxes.length < 2) {
+                alert('请至少选择两个生命进行对比');
+                return;
+            }
+
+            const lives = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const response = await fetch('/api/compare', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ lives })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('对比失败: ' + result.error);
+                    return;
+                }
+
+                displayComparison(result.data);
+            } catch (error) {
+                showError('对比失败: ' + error.message);
+            }
+        }
+
+        // 显示对比结果
+        function displayComparison(comparison) {
+            const container = document.getElementById('comparison-result');
+
+            const lifeNames = Object.keys(comparison);
+
+            container.innerHTML = `
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>指标</th>
+                            ${lifeNames.map(name => `<th>${name}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>迭代次数</strong></td>
+                            ${lifeNames.map(name => `<td>${comparison[name].iterations}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>思考次数</strong></td>
+                            ${lifeNames.map(name => `<td>${comparison[name].thoughts}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>行动次数</strong></td>
+                            ${lifeNames.map(name => `<td>${comparison[name].actions}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>目标数量</strong></td>
+                            ${lifeNames.map(name => `<td>${comparison[name].goals_count}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>成就数量</strong></td>
+                            ${lifeNames.map(name => `<td>${comparison[name].achievements_count}</td>`).join('')}
+                        </tr>
+                        <tr>
+                            <td><strong>日记条数</strong></td>
+                            ${lifeNames.map(name => `<td>${comparison[name].diary_entries}</td>`).join('')}
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // 显示创建生命模态框
+        function showCreateLifeModal() {
+            document.getElementById('new-life-name').value = '';
+            openModal('create-life-modal');
+        }
+
+        // 创建生命
+        async function createLife() {
+            const name = document.getElementById('new-life-name').value.trim();
+
+            try {
+                const response = await fetch('/api/lives/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: name || null })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError('创建失败: ' + result.error);
+                    return;
+                }
+
+                alert(`生命 "${result.data.name}" 创建成功！`);
+                closeModal('create-life-modal');
+                loadLives();
+            } catch (error) {
+                showError('创建失败: ' + error.message);
+            }
+        }
+
+        // 打开模态框
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        // 关闭模态框
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // 显示错误
+        function showError(message) {
+            alert('错误: ' + message);
+        }
+
+        // 点击模态框背景关闭
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

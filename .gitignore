@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 日志文件
+*.log
+
+# PID 文件
+*.pid
+
+# 轮回系统数据
+lives/
+my_space/
+myspace/
+old_*/
+old_*/
+*.backup
+my_space_backup*/
+
+# 临时文件
+*.tmp
+*.bak
+*.bak[0-9]
+
+# 符号链接（当前生命）
+# my_space 是符号链接，指向 lives/ 下的某个生命
+
+# 实验数据（保留结构但忽略内容）
+# old_1/ 会被忽略，因为它包含旧数据
+
+# 其他
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
